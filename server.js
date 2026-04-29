@@ -27,5 +27,3 @@ app.listen(PORT, (err) => {
     ? console.log(err)
     : console.log(`Le serveur est sur le : http://localhost:${PORT}`);
 });
-
-const cors = require("cors");
