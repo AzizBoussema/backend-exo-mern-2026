@@ -1,5 +1,6 @@
 const { validationResult } = require("express-validator");
 const Restaurant = require("../models/Restaurant");
+const User = require("../models/User");
 
 const sendError = (res, status, msg) =>
   res.status(status).json({ errors: [{ msg }] });
@@ -69,7 +70,8 @@ exports.getMyRestaurant = async (req, res) => {
 // ---------GET RESTAURANT BY ID--------
 exports.getRestaurantById = async (req, res) => {
   try {
-    const restaurant = await Restaurant.findById(req.params.id);
+    const restaurant = await Restaurant.findById(req.params.id)
+      .populate("ownerId", "name email phone");
     if (!restaurant) {
       return sendError(res, 404, "Restaurant introuvable.");
     }
@@ -80,5 +82,74 @@ exports.getRestaurantById = async (req, res) => {
     });
   } catch (error) {
     return sendError(res, 500, "Erreur serveur.");
+  }
+};
+
+// ---------[ADMIN] GET ALL RESTAURANTS (avec propriétaires) --------
+exports.adminGetAllRestaurants = async (req, res) => {
+  try {
+    const restaurants = await Restaurant.find()
+      .populate("ownerId", "name email phone createdAt")
+      .sort({ createdAt: -1 });
+    return res.status(200).json({ success: true, data: restaurants });
+  } catch (error) {
+    return sendError(res, 500, "Erreur serveur.");
+  }
+};
+
+// ---------[ADMIN] VALIDER UN RESTAURANT --------
+exports.validateRestaurant = async (req, res) => {
+  try {
+    const restaurant = await Restaurant.findById(req.params.id);
+    if (!restaurant) {
+      return sendError(res, 404, "Restaurant introuvable.");
+    }
+
+    restaurant.isValidated = true;
+    restaurant.isActive = true;
+    await restaurant.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Restaurant validé avec succès.",
+      data: restaurant,
+    });
+  } catch (error) {
+    return sendError(res, 500, "Erreur lors de la validation.");
+  }
+};
+
+// ---------[ADMIN] REJETER / SUSPENDRE UN RESTAURANT --------
+exports.rejectRestaurant = async (req, res) => {
+  try {
+    const restaurant = await Restaurant.findById(req.params.id);
+    if (!restaurant) {
+      return sendError(res, 404, "Restaurant introuvable.");
+    }
+
+    restaurant.isValidated = false;
+    restaurant.isActive = false;
+    await restaurant.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Restaurant suspendu.",
+      data: restaurant,
+    });
+  } catch (error) {
+    return sendError(res, 500, "Erreur lors de la suspension.");
+  }
+};
+
+// ---------[ADMIN] SUPPRIMER UN RESTAURANT --------
+exports.adminDeleteRestaurant = async (req, res) => {
+  try {
+    const restaurant = await Restaurant.findByIdAndDelete(req.params.id);
+    if (!restaurant) {
+      return sendError(res, 404, "Restaurant introuvable.");
+    }
+    return res.status(200).json({ success: true, data: { _id: req.params.id } });
+  } catch (error) {
+    return sendError(res, 500, "Erreur lors de la suppression.");
   }
 };

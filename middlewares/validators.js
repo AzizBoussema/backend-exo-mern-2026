@@ -4,14 +4,16 @@ const { check, validationResult } = require("express-validator");
 exports.registerValidation = () => [
   check("name", "Nom est obligatoire").notEmpty().trim(),
   check("email", "Entrer un email valide").isEmail().normalizeEmail(),
-  check("password", "Longueur du mot de passe doit être entre 5 et 15 caractères").isLength({ min: 5, max: 15 }),
+  check("password", "Longueur du mot de passe doit être entre 8 et 50 caractères").isLength({ min: 8, max: 50 }),
   check("role", "Rôle doit être 'client' ou 'restaurant'").optional().isIn(["client", "restaurant"]),
 ];
 
 // Validations pour la connexion
+// Note: pas de contrainte de longueur sur le login pour ne pas bloquer
+// les utilisateurs existants — on vérifie seulement que le champ n'est pas vide.
 exports.loginValidation = () => [
   check("email", "Entrer un email valide").isEmail().normalizeEmail(),
-  check("password", "Longueur du mot de passe doit être entre 5 et 15 caractères").isLength({ min: 5, max: 15 }),
+  check("password", "Le mot de passe est requis").notEmpty(),
 ];
 
 // Middleware pour vérifier les erreurs de validation

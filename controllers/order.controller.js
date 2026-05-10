@@ -10,6 +10,11 @@ exports.createOrder = async (req, res) => {
   try {
     const { products, deliveryAddress, paymentMethod } = req.body;
 
+    // Les restaurateurs ne peuvent pas passer de commande
+    if (req.user.role === "restaurant") {
+      return sendError(res, 403, "Les restaurateurs ne peuvent pas passer de commande.");
+    }
+
     if (!products || products.length === 0) {
       return sendError(res, 400, "Aucun produit dans la commande.");
     }

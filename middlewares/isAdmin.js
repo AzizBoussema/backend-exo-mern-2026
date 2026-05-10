@@ -3,27 +3,26 @@ const User = require("../models/User");
 
 const isAdmin = async (req, res, next) => {
   try {
-      const token = req.headers["authorization"];
-      
-    // console.log(req.headers["authorization"]);
+    const token = req.headers["authorization"];
+
     if (!token) {
-      return res.status(400).json({ msg: "Pas de token" });
+      return res.status(401).json({ success: false, errors: [{ msg: "Pas de token fourni" }] });
     }
 
-    //user qui correspond a ce token
     const decode = jwt.verify(token, process.env.SECRET_KEY);
-    // console.log(decode)
-    const foundUser = await User.findOne({ _id: decode.id });
+    const foundUser = await User.findById(decode.id);
+
     if (!foundUser) {
-      return res.status(404).json({ msg: "Utilisateur non trouvé" });
+      return res.status(404).json({ success: false, errors: [{ msg: "Utilisateur non trouvé" }] });
     }
     if (!foundUser.isAdmin) {
-      return res.status(403).json({ msg: "Vous n'avez pas le droit " });
+      return res.status(403).json({ success: false, errors: [{ msg: "Accès réservé aux administrateurs" }] });
     }
+
     req.user = foundUser;
     next();
   } catch (error) {
-    res.status(500).json({ msg: "Impossible de vérifier", error });
+    return res.status(401).json({ success: false, errors: [{ msg: "Token invalide ou expiré" }] });
   }
 };
 

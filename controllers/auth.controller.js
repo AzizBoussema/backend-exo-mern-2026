@@ -1,6 +1,6 @@
 const User = require("../models/User");
 const Restaurant = require("../models/Restaurant");
-const bcrypt = require("bcrypt");
+const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 // Helper pour envoyer des erreurs formatées
@@ -65,12 +65,12 @@ exports.register = async (req, res) => {
       name,
       email,
       password: hashPassword,
-      image,
-      role: role || "client",
-      firstName,
-      lastName,
-      address,
-      phone,
+      image:     image     || undefined,
+      role:      role      || "client",
+      firstName: firstName || undefined,
+      lastName:  lastName  || undefined,
+      address:   address   || undefined,
+      phone:     phone     || undefined,
     });
 
     await newUser.save();
@@ -78,18 +78,18 @@ exports.register = async (req, res) => {
     // Si c'est un restaurateur, créer un restaurant
     if (newUser.role === "restaurant") {
       await Restaurant.create({
-        ownerId: newUser._id,
-        name: businessName || name,
-        businessName: businessName || name,
-        description: Array.isArray(specialties) && specialties.length
+        ownerId:       newUser._id,
+        name:          businessName || name,
+        businessName:  businessName || name,
+        description:   Array.isArray(specialties) && specialties.length
           ? `Specialites: ${specialties.join(", ")}`
           : "",
-        image,
-        address,
-        phone,
+        image:         image    || undefined,
+        address:       address  || undefined,
+        phone:         phone    || undefined,
         email,
         registrationRNE,
-        specialties: specialties || [],
+        specialties:   specialties  || [],
         deliveryZones: deliveryZones || [],
       });
     }
@@ -108,8 +108,35 @@ exports.register = async (req, res) => {
       token,
     });
   } catch (error) {
-    console.error("Register error:", error);
-    return sendError(res, 500, "Echec d'enregistrement.");
+    // Log complet côté serveur pour faciliter le débogage
+    console.error("[REGISTER ERROR]", error.name, "|", error.message, "|", "code:", error.code);
+
+    // Erreurs de validation Mongoose (champ requis, match, minlength…)
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors).map((e) => ({ msg: e.message }));
+      return res.status(400).json({ success: false, errors: messages });
+    }
+
+    // Erreur clé dupliquée MongoDB (email ou RNE déjà utilisé)
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyValue || {})[0];
+      const label = field === "email" ? "cet email" : field === "registrationRNE" ? "ce numéro RNE" : "ces informations";
+      return res.status(400).json({
+        success: false,
+        errors: [{ msg: `Un compte avec ${label} existe déjà.` }],
+      });
+    }
+
+    // En développement : renvoyer le détail de l'erreur pour débogage
+    const isDev = process.env.NODE_ENV !== "production";
+    return res.status(500).json({
+      success: false,
+      errors: [{
+        msg: isDev
+          ? `[DEV ${error.name}] ${error.message}`
+          : "Echec d'enregistrement.",
+      }],
+    });
   }
 };
 

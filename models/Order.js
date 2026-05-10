@@ -170,11 +170,9 @@ orderSchema.pre("save", function () {
 });
 
 // Middleware pour gérer l'annulation
-orderSchema.pre("findByIdAndUpdate", function () {
-  if (
-    this._update.status === "cancelled" &&
-    !this._update.cancellationReason
-  ) {
+orderSchema.pre("findOneAndUpdate", function () {
+  const update = this.getUpdate();
+  if (update.status === "cancelled" && !update.cancellationReason) {
     throw new Error(
       "La raison d'annulation est requise quand on annule une commande"
     );

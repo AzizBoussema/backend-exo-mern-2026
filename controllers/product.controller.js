@@ -106,6 +106,8 @@ exports.getProductsByRestaurant = async (req, res) => {
 };
 
 // ---------GET PRODUCT BY ID--------
+// Route publique : tout le monde peut consulter un produit publié.
+// La restriction (ne gérer que ses propres produits) est gérée dans update/delete.
 exports.getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id).populate(
@@ -114,14 +116,6 @@ exports.getProductById = async (req, res) => {
     );
     if (!product) {
       return sendError(res, 404, "Produit introuvable.");
-    }
-
-    // Si l'utilisateur est un vendeur, vérifier qu'il possède ce produit
-    if (req.user && req.user.role === "restaurant") {
-      const restaurant = await getVendorRestaurant(req.user._id);
-      if (!restaurant || product.restaurantId.toString() !== restaurant._id.toString()) {
-        return sendError(res, 403, "Vous ne pouvez accéder qu'à vos propres produits.");
-      }
     }
 
     return res.status(200).json({

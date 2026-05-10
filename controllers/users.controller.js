@@ -33,6 +33,24 @@ exports.getOneUser = async (req, res) => {
   }
 };
 
+// ---------[ADMIN] TOGGLE ACTIVATION USER--------
+exports.toggleUserActive = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return sendError(res, 404, "Utilisateur introuvable.");
+    }
+    user.isActive = !user.isActive;
+    await user.save({ validateModifiedOnly: true });
+    return res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    return sendError(res, 500, "Erreur serveur.");
+  }
+};
+
 // ---------DELETE USER--------
 exports.deleteUser = async (req, res) => {
   try {
@@ -90,9 +108,50 @@ exports.updateMyProfile = async (req, res) => {
       return sendError(res, 404, "Utilisateur non trouvé.");
     }
 
+    // Si c'est un restaurateur, mettre à jour les infos du restaurant aussi
+    if (req.user.role === "restaurant") {
+      const Restaurant = require("../models/Restaurant");
+      const { businessName, restaurantDescription, restaurantPhone,
+              restaurantEmail, restaurantAddress, specialties,
+              deliveryZones, deliveryTime } = req.body;
+
+      const restaurantUpdate = {};
+      if (businessName)           restaurantUpdate.name         = businessName;
+      if (businessName)           restaurantUpdate.businessName = businessName;
+      if (restaurantDescription)  restaurantUpdate.description  = restaurantDescription;
+      if (restaurantPhone)        restaurantUpdate.phone        = restaurantPhone;
+      if (restaurantEmail)        restaurantUpdate.email        = restaurantEmail;
+      if (restaurantAddress)      restaurantUpdate.address      = restaurantAddress;
+      if (deliveryTime)           restaurantUpdate.deliveryTime = deliveryTime;
+      if (specialties !== undefined)
+        restaurantUpdate.specialties   = Array.isArray(specialties)
+          ? specialties
+          : specialties.split(",").map((s) => s.trim()).filter(Boolean);
+      if (deliveryZones !== undefined)
+        restaurantUpdate.deliveryZones = Array.isArray(deliveryZones)
+          ? deliveryZones
+          : deliveryZones.split(",").map((z) => z.trim()).filter(Boolean);
+
+      if (Object.keys(restaurantUpdate).length > 0) {
+        await Restaurant.findOneAndUpdate(
+          { ownerId: req.user._id },
+          restaurantUpdate,
+          { new: true, runValidators: true }
+        );
+      }
+    }
+
+    // Renvoyer l'utilisateur enrichi avec son restaurant (comme /auth/current)
+    const Restaurant = require("../models/Restaurant");
+    const restaurant = updatedUser.role === "restaurant"
+      ? await Restaurant.findOne({ ownerId: updatedUser._id }).lean()
+      : null;
+
+    const fullUser = { ...updatedUser.toObject(), restaurant };
+
     return res.status(200).json({
       success: true,
-      data: updatedUser,
+      data: fullUser,
     });
   } catch (error) {
     return sendError(res, 500, "Erreur serveur lors de la mise à jour.");

@@ -81,22 +81,23 @@ const userSchema = new mongoose.Schema(
 userSchema.index({ email: 1, isActive: 1 });
 userSchema.index({ role: 1, isActive: 1 });
 
-// Middleware pour éviter les doublons
-userSchema.pre("save", async function (next) {
-  if (!this.isModified("email")) {
-    return next();
-  }
+// Vérification anti-doublon email (async pur, sans next — pattern correct pour Mongoose 9)
+userSchema.pre("save", async function () {
+  if (!this.isModified("email")) return;
 
   const existingUser = await mongoose.model("user").findOne({
     email: this.email,
-    _id: { $ne: this._id },
+    _id:   { $ne: this._id },
   });
 
   if (existingUser) {
-    throw new Error("Cet email est déjà utilisé");
+    const err = new mongoose.Error.ValidatorError({
+      message: "Cet email est déjà utilisé",
+      path:    "email",
+      value:   this.email,
+    });
+    throw new mongoose.Error.ValidationError(err);
   }
-
-  next();
 });
 
 const User = mongoose.model("user", userSchema);

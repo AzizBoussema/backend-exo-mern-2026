@@ -91,18 +91,18 @@ const restaurantSchema = new mongoose.Schema(
       required: [true, "Le propriétaire est requis"],
       unique: true,
       index: true,
-      validate: {
-        validator: async function (v) {
-          const User = mongoose.model("user");
-          const user = await User.findById(v);
-          return user && user.role === "restaurant";
-        },
-        message: "Le propriétaire doit être un utilisateur avec le rôle 'restaurant'",
-      },
+      // Le contrôle du rôle est fait dans le controller — pas de validator async ici
+      // (un validator async sur ownerId fait une requête DB supplémentaire et peut
+      // provoquer des erreurs non-ValidationError selon la version de Mongoose)
     },
     isActive: {
       type: Boolean,
       default: true,
+      index: true,
+    },
+    isValidated: {
+      type: Boolean,
+      default: false,   // false par défaut : en attente de validation admin
       index: true,
     },
     totalOrders: {
@@ -124,19 +124,19 @@ restaurantSchema.index({ isActive: 1, createdAt: -1 });
 restaurantSchema.index({ specialties: 1 });
 restaurantSchema.index({ deliveryZones: 1 });
 
-// Middleware pour vérifier l'unicité du RNE
-restaurantSchema.pre("findByIdAndUpdate", async function (next) {
-  if (this._update.registrationRNE) {
-    const existing = await mongoose.model("restaurant").findOne({
-      registrationRNE: this._update.registrationRNE,
-      _id: { $ne: this._id },
-    });
+// Vérification unicité RNE lors d'une mise à jour (async pur, sans next)
+restaurantSchema.pre("findOneAndUpdate", async function () {
+  const update = this.getUpdate();
+  if (!update || !update.registrationRNE) return;
 
-    if (existing) {
-      throw new Error("Ce numéro RNE est déjà utilisé");
-    }
+  const existing = await mongoose.model("restaurant").findOne({
+    registrationRNE: update.registrationRNE,
+    _id: { $ne: this.getQuery()._id },
+  });
+
+  if (existing) {
+    throw new Error("Ce numéro RNE est déjà utilisé");
   }
-  next();
 });
 
 module.exports = mongoose.model("restaurant", restaurantSchema);
